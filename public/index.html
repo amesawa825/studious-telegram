@@ -14,9 +14,14 @@
     <h1>しりとり</h1>
     <!-- 現在の単語を表示する場所 -->
     <p id="previousWord"></p>
+
+    <h3>これまでの履歴：</h3>
+    <ul id="historyList"></ul>
+
     <!-- 次の文字を入力するフォーム -->
     <input id="nextWordInput" type="text" />
     <button id="nextWordSendButton">送信</button>
+    <button id="resetSendButton">リセット</button>
 
     <!-- JavaScriptを実行 -->
     <script>
@@ -30,6 +35,19 @@
             const paragraph = document.querySelector("#previousWord");
             // 取得したタグの中身を書き換える
             paragraph.innerHTML = `前の単語: ${previousWord}`;
+
+            // 1. サーバーから履歴の配列（JSON）を取得
+            const historyResponse = await fetch("/history", { method: "GET" });
+            const histories = await historyResponse.json(); // ["しりとり", "りんご", ...] のような配列になる
+
+            // 2. 履歴を表示する<ul>タグを取得
+            const historyList = document.querySelector("#historyList");
+            // 3. 配列の中身をループして、1つずつ<li>タグにして追加
+            histories.forEach((word) => {
+                const li = document.createElement("li");
+                li.textContent = word;
+                historyList.appendChild(li);
+            });
         }
         // 送信ボタンの押下時に実行
         document.querySelector("#nextWordSendButton").onclick = async (event) => {
@@ -52,6 +70,43 @@
             if (response.status !== 200) {
                 const errorJson = await response.text();
                 const errorObj = JSON.parse(errorJson);
+                if (errorObj["errorCode"] === "10001") {
+                    // 【文字が続いていないエラーの場合】
+                    alert(errorObj["errorMessage"]);
+                } else if (errorObj["errorCode"] === "10011") {
+                    // 【「ん」がついたエラーの場合】
+                    alert(errorObj["errorMessage"]);
+                    if (document.querySelector("#nextWordInput")) {
+                        document.querySelector("#nextWordInput").remove();
+                    }
+                    if (document.querySelector("#nextWordSendButton")) {
+                        document.querySelector("#nextWordSendButton").remove();
+                    }
+                    if (document.querySelector("h1")) {
+                        document.querySelector("h1").remove();
+                    }
+                    if (document.querySelector("#previousWord")) {
+                        document.querySelector("#previousWord").remove();
+                    }
+
+                    // 1.「これまでの履歴：」の文字（h3）を消す
+                    if (document.querySelector("h3")) {
+                        document.querySelector("h3").remove();
+                    }
+                    // 2. 履歴のリスト（ul）を消す
+                    if (document.querySelector("#historyList")) {
+                        document.querySelector("#historyList").remove();
+                    }
+
+                    const htmlResponse = await fetch("gameover.html");
+                    const gameoverHtml = await htmlResponse.text();
+                    document.body.insertAdjacentHTML("beforeend", gameoverHtml);
+
+                }
+
+
+
+
                 alert(errorObj["errorMessage"]);
                 return;
             }
@@ -62,10 +117,24 @@
             const paragraph = document.querySelector("#previousWord");
             // 取得したタグの中身を書き換える
             paragraph.innerHTML = `前の単語: ${previousWord}`;
+            const historyList = document.querySelector("#historyList");
+            // 2. 新しい <li> タグを作って単語を入れ、リストの末尾に追加する
+            const li = document.createElement("li");
+            li.textContent = previousWord;
+            historyList.appendChild(li);
+
+
             // inputタグの中身を消去する
             nextWordInput.value = "";
         }
 
+
+        document.querySelector("#resetSendButton").onclick = async (event) => {
+            // POST /resetを実行
+            await fetch("/reset", { method: "POST" });
+            // ページをリロードする
+            location.reload();
+        };
     </script>
 </body>
 
